@@ -1,6 +1,7 @@
 ﻿using FootballQuizAPI.DAL;
 using FootballQuizAPI.DTO;
 using FootballQuizAPI.Models;
+using FootballQuizAPI.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -18,16 +19,18 @@ namespace FootballQuizAPI.Controllers
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly AppDbContext _context;
+        private readonly TokenService _tokenService;
 
-        public UserController(UserManager<User> userManager, SignInManager<User> signInManager, AppDbContext context)
+        public UserController(UserManager<User> userManager, SignInManager<User> signInManager, AppDbContext context, TokenService tokenService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _context = context;
+            _tokenService = tokenService;
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<IdentityUser>>> GetUsers(int page = 1, int pageSize = 10, string countryCode = null)
+        public async Task<ActionResult<List<IdentityUser>>> GetUsers(int page = 1, int pageSize = 10, string? countryCode = null)
         {
             var query = _userManager.Users.AsQueryable();
 
@@ -64,7 +67,7 @@ namespace FootballQuizAPI.Controllers
                 return NotFound("User not found");
             }
 
-            var result = await _signInManager.PasswordSignInAsync(user, model.Password,false,false);
+            var result = await _signInManager.PasswordSignInAsync(user, model.Password, false, false);
 
             if (result.Succeeded)
             {
@@ -129,6 +132,58 @@ namespace FootballQuizAPI.Controllers
             return BadRequest(result.Errors);
         }
 
+
+
+
+        [HttpPost("createRandom100")]
+        public async Task<IActionResult> CreateUsers()
+        {
+            var random = new Random();
+            var countryCodes = new[]
+            {
+        "us", "de", "fr", "gb", "it", "es", "jp", "cn", "kr", "in",
+        "br", "za", "mx", "au", "ca", "ru", "se", "no", "fi", "dk",
+        "pl", "nl", "be", "ch", "at", "cz", "hu", "sk", "ro", "bg",
+        "hr", "si", "lt", "lv", "ee", "ie", "pt", "tr", "il", "sa",
+        "ae", "ng", "ke", "gh", "eg", "ma", "dz", "tn", "qa", "om",
+        "kw", "bh", "sg", "my", "ph", "vn", "th", "id", "pk"
+           };
+
+            var userCreationResults = new List<object>();
+
+            for (int i = 0; i < 100; i++)
+            {
+                var username = "User" + random.Next(1000000, 9999999);
+                var password = random.Next(10000, 99999).ToString();
+                var countryCode = countryCodes[random.Next(countryCodes.Length)];
+
+                var user = new User
+                {
+                    UserName = username,
+                    CountryCode = countryCode,
+                };
+
+                var result = await _userManager.CreateAsync(user, password);
+
+                if (result.Succeeded)
+                {
+                    var roleResult = await _userManager.AddToRoleAsync(user, "User");
+
+                    if (!roleResult.Succeeded)
+                    {
+                        return BadRequest("Error Role Assignment");
+                    }
+
+                    userCreationResults.Add(new { username, password, country = countryCode });
+                }
+                else
+                {
+                    userCreationResults.Add(new { username, error = result.Errors });
+                }
+            }
+
+            return Ok(userCreationResults);
+        }
 
 
     }

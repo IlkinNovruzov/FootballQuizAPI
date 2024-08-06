@@ -2,6 +2,7 @@ using FootballQuizAPI.Models;
 using FootballQuizAPI.DAL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using FootballQuizAPI.Services;
 
 namespace FootballQuizAPI
 {
@@ -23,12 +24,13 @@ namespace FootballQuizAPI
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowSpecificOrigin",
-                    builder => builder.WithOrigins("http://127.0.0.1:5500")
+                    builder => builder.WithOrigins("http://127.0.0.1:5500", "http://localhost:5174")
                                       .AllowAnyMethod()
                                       .AllowAnyHeader());
             });
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddScoped<TokenService>();
             builder.Services.Configure<IdentityOptions>(options =>
             {
                 // Password settings.

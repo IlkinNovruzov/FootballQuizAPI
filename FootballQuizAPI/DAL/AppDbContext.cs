@@ -37,6 +37,7 @@ namespace FootballQuizAPI.DAL
             .WithOne(c => c.Question)
             .HasForeignKey(c=>c.QuestionId)
             .OnDelete(DeleteBehavior.Cascade);
+
             modelBuilder.Entity<Role>().HasData(
                 new Role { Id = 1, Name = "Admin", NormalizedName = "ADMIN" },
                   new Role { Id = 2, Name = "User", NormalizedName = "USER" }
