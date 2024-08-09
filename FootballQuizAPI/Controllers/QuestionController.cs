@@ -64,7 +64,6 @@ namespace FootballQuizAPI.Controllers
             return Ok(questions);
         }
 
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetQuestion(int id)
         {
@@ -83,7 +82,6 @@ namespace FootballQuizAPI.Controllers
 
             return Ok(getQuestionDTO);
         }
-
 
         [HttpPost("create")]
         public async Task<IActionResult> CreateQuestion([FromBody] CreateQuestionDTO dto)
@@ -195,16 +193,16 @@ namespace FootballQuizAPI.Controllers
             return Ok("Created");
         }
 
-        [HttpPost("verify-answer")]
-        public async Task<IActionResult> VerifyAnswer([FromBody] AnswerDTO answer)
-        {
-            var question = await _context.Questions.Include(q => q.Choices).FirstOrDefaultAsync(q => q.Id == answer.QuestionId);
+        //[HttpPost("verify-answer")]
+        //public async Task<IActionResult> VerifyAnswer([FromBody] AnswerDTO answer)
+        //{
+        //    var question = await _context.Questions.Include(q => q.Choices).FirstOrDefaultAsync(q => q.Id == answer.QuestionId);
 
-            if (question == null) return NotFound("Question not found.");
+        //    if (question == null) return NotFound("Question not found.");
 
-            var isCorrect = question.Answer == answer.SelectedChoice;
+        //    var isCorrect = question.Answer == answer.SelectedChoice;
 
-            return Ok(new { isCorrect });
-        }
+        //    return Ok(new { isCorrect });
+        //}
     }
 }

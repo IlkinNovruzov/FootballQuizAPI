@@ -12,8 +12,8 @@ using System.Text;
 
 namespace FootballQuizAPI.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
+    [ApiController]
     public class UserController : ControllerBase
     {
         private readonly UserManager<User> _userManager;

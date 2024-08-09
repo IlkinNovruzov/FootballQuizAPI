@@ -14,3 +14,4 @@ namespace FootballQuizAPI.Models
         public List<QuizResult> QuizResults { get; set; }
     }
 }
+ 
