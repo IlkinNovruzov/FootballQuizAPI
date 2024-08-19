@@ -14,55 +14,74 @@ namespace FootballQuizAPI.Controllers
     public class QuestionController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly TokenService _tokenService;
 
-        public QuestionController(AppDbContext context)
+        public QuestionController(AppDbContext context, TokenService tokenService)
         {
             _context = context;
+            _tokenService = tokenService;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<List<IdentityUser>>> GetUsers()
+        [HttpGet("get-categories")]
+        public async Task<ActionResult<List<IdentityUser>>> GetCategories(int page = 1, int pageSize = 7)
         {
-            var questions = await _context.Questions
-                                .Include(q => q.Choices)
-                                .ToListAsync();
+            var query = _context.Categories.AsQueryable();
 
-            var getQuestionDTOs = questions.Select(question => new GetQuestionDTO
+            var categories = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var totalCategories = await query.CountAsync();
+
+            var totalPages = (int)Math.Ceiling(totalCategories / (double)pageSize);
+
+            var response = new
             {
-                Id = question.Id,
-                QuestionText = question.QuestionText,
-                Answer = question.Answer,
-                ImageUrl = question.ImageUrl,
-                Choices = question.Choices.Select(c => c.Text).ToList()
-            }).ToList();
+                Categories = categories,
+                TotalPages = totalPages,
+                CurrentPage = page
+            };
 
-            return Ok(getQuestionDTOs);
+            return Ok(response);
         }
 
-        [HttpGet("get-questions")]
-        public async Task<IActionResult> GetQuestions([FromQuery] int categoryId, [FromQuery] string difficulty, [FromQuery] int questionCount)
+        [HttpPost("get-questions")]
+        public async Task<IActionResult> GetQuestions([FromBody] List<DifficultyDTO> categoryDifficultyRequests)
         {
-            var questionsQuery = _context.Questions
-                .Include(q => q.Choices)
-                .Where(q => q.CategoryId == categoryId && q.Difficulty == difficulty);
+            if (categoryDifficultyRequests == null || categoryDifficultyRequests.Count == 0)  return BadRequest("Kategori ve zorluk seviyeleri gönderilmedi.");
 
-            if (await questionsQuery.CountAsync() == 0) return NotFound("No questions found for the specified category and difficulty.");
+            var questionsList = new List<GetQuestionDTO>();
 
-            var questions = await questionsQuery
-                .OrderBy(q => Guid.NewGuid()) // Randomize the order
-                .Take(questionCount) // Take the specified number of questions
-                .Select(q => new GetQuestionDTO
-                {
-                    Id = q.Id,
-                    QuestionText = q.QuestionText,
-                    Answer = q.Answer,
-                    ImageUrl = q.ImageUrl,
-                    Choices = q.Choices.Select(c => c.Text).ToList()
-                })
-                .ToListAsync();
+            foreach (var request in categoryDifficultyRequests)
+            {
+                var questionsQuery = _context.Questions
+                    .Include(q => q.Choices)
+                    .Where(q => q.CategoryId == request.CategoryId && q.Difficulty == request.Difficulty);
 
-            return Ok(questions);
+                if (await questionsQuery.CountAsync() == 0) continue;
+
+                var questions = await questionsQuery
+                    .OrderBy(q => Guid.NewGuid()) // Sırayı rastgele yap
+                    .Take(5) // Belirtilen sayıda soruyu al
+                    .Select(q => new GetQuestionDTO
+                    {
+                        Id = q.Id,
+                        QuestionText = q.QuestionText,
+                        Answer = q.Answer,
+                        ImageUrl = q.ImageUrl,
+                        Choices = q.Choices.Select(c => c.Text).ToList()
+                    })
+                    .ToListAsync();
+
+                questionsList.AddRange(questions);
+            }
+
+            if (questionsList.Count == 0)  return NotFound("Belirtilen kategoriler ve zorluk seviyeleri için soru bulunamadı.");
+
+            // Soruları karıştır
+            questionsList = questionsList.OrderBy(q => Guid.NewGuid()).ToList();
+
+            return Ok(questionsList);
         }
+
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetQuestion(int id)
@@ -109,7 +128,7 @@ namespace FootballQuizAPI.Controllers
             }
             await _context.SaveChangesAsync();
 
-            return Ok(new { ok="Succsed" });
+            return Ok(new { ok = "Succsed" });
         }
 
         [HttpDelete]
@@ -204,5 +223,6 @@ namespace FootballQuizAPI.Controllers
 
         //    return Ok(new { isCorrect });
         //}
+
     }
 }

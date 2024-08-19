@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
 
 namespace FootballQuizAPI.Controllers
 {
@@ -59,16 +60,16 @@ namespace FootballQuizAPI.Controllers
         {
             var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
             if (user == null) return Unauthorized("Invalid token or user.");
-            
+
             return Ok(user);
         }
 
-            [HttpPost("register")]
+        [HttpPost("register")]
         public async Task<IActionResult> CreateUser([FromBody] UpdateUserDTO dto)
         {
             var user = new User
             {
-                UserName = dto.UserName.Trim(),
+                UserName = dto.UserName,
                 CountryCode = dto.CountryCode,
             };
 
@@ -76,31 +77,44 @@ namespace FootballQuizAPI.Controllers
 
             if (result.Succeeded)
             {
-                var roleRusult = await _userManager.AddToRoleAsync(user, "User");
+                var roleResult = await _userManager.AddToRoleAsync(user, "User");
 
-                if (!roleRusult.Succeeded) return BadRequest("Error Role Assignment");
+                if (!roleResult.Succeeded)
+                {
+                    return BadRequest(new
+                    {
+                        Message = "User creation succeeded, but role assignment failed.",
+                        Errors = roleResult.Errors.Select(e => e.Description)
+                    });
+                }
 
-                return Ok(new { Message = "Register successful" });
+                var jwtToken = await _tokenService.GenerateToken(user);
+                if (jwtToken == null) return StatusCode(500, "User creation and role assignment succeeded, but token generation failed.");
+
+                return Ok(new { jwtToken });
             }
 
-            return BadRequest(result.Errors);
+            return BadRequest(new
+            {
+                Message = "User creation failed.",
+                Errors = result.Errors.Select(e => e.Description)
+            });
         }
 
         [HttpPut("update")]
-        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO model)
+        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO model, [FromHeader(Name = "Authorization")] string token)
         {
-            var user = await _userManager.FindByNameAsync(model.UserName);
-            if (user == null) return NotFound("User not found");
+            var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
+            if (user == null) return Unauthorized("Invalid token or user.");
 
-            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, model.Password);
+            user.UserName = model.UserName;
+            if (user.PasswordHash != null)
+                user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, model.Password);
             user.CountryCode = model.CountryCode;
 
             var result = await _userManager.UpdateAsync(user);
 
-            if (result.Succeeded)
-            {
-                return Ok();
-            }
+            if (result.Succeeded) return Ok();
 
             return BadRequest(result.Errors);
         }
@@ -123,7 +137,8 @@ namespace FootballQuizAPI.Controllers
             if (result.Succeeded)
             {
                 var jwtToken = await _tokenService.GenerateToken(user);
-                return Ok(jwtToken);
+                return Ok(new { jwtToken });
+
             }
 
             if (result.IsLockedOut)
@@ -148,7 +163,7 @@ namespace FootballQuizAPI.Controllers
                 {
                     user = new User
                     {
-                        UserName = googleUser.Name.Trim(),
+                        UserName = googleUser.Name.Replace(" ", ""),
                         Email = googleUser.Email,
                         EmailConfirmed = true,
                     };
@@ -167,7 +182,70 @@ namespace FootballQuizAPI.Controllers
 
             var jwtToken = await _tokenService.GenerateToken(user);
 
-            return Ok(new { jwtToken });
+            return Ok(new { token = jwtToken, countryCode = user.CountryCode });
+        }
+
+        [HttpPost("result")]
+        public async Task<IActionResult> AddQuizResult([FromBody] long xp, [FromHeader(Name = "Authorization")] string token)
+        {
+            var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
+            if (user == null) return Unauthorized("Invalid token or user.");
+
+            user.XP += xp;
+            var quizResult = new QuizResult
+            {
+                XP = xp,
+                IsActive = true,
+                UserId = user.Id,
+                DateTaken = DateTime.UtcNow
+            };
+            _context.QuizResults.Add(quizResult);
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return Ok("saved");
+        }
+
+        [HttpGet("home")]
+        public async Task<IActionResult> HomePage([FromHeader(Name = "Authorization")] string token)
+        {
+            var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
+            if (user == null) return Unauthorized("Invalid token or user.");
+
+            var (currentLevel, xpForNextLevel, currentLevelXP) = CalculateLevelAndXP(user.XP);
+
+            var homePageModel = new HomePageDTO
+            {
+                Username = user.UserName,
+                Email = user.Email,
+                CountryCode = user.CountryCode,
+                Level = currentLevel,
+                Heart = user.Heart,
+                ExtraHeart = user.ExtraHeart,
+                Chest = user.Chest,
+                Hint = user.Hint,
+                CurrentXP = currentLevelXP,
+                XPForNextLevel = xpForNextLevel
+            };
+            return Ok(homePageModel);
+        }
+
+
+
+        private static (byte currentLevel, long xpForNextLevel, long currentLevelXP) CalculateLevelAndXP(long totalXP)
+        {
+            byte level = 1;
+            long xpForNextLevel = 50;
+            long remainingXP = totalXP;
+
+            while (remainingXP >= xpForNextLevel)
+            {
+                remainingXP -= xpForNextLevel;
+                level++;
+                xpForNextLevel = (long)Math.Round(xpForNextLevel * 1.5);
+            }
+
+            return (level, xpForNextLevel, remainingXP);
         }
     }
 }

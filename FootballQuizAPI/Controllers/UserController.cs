@@ -17,16 +17,10 @@ namespace FootballQuizAPI.Controllers
     public class UserController : ControllerBase
     {
         private readonly UserManager<User> _userManager;
-        private readonly SignInManager<User> _signInManager;
-        private readonly AppDbContext _context;
-        private readonly TokenService _tokenService;
 
-        public UserController(UserManager<User> userManager, SignInManager<User> signInManager, AppDbContext context, TokenService tokenService)
+        public UserController(UserManager<User> userManager)
         {
             _userManager = userManager;
-            _signInManager = signInManager;
-            _context = context;
-            _tokenService = tokenService;
         }
 
         [HttpGet]
@@ -54,84 +48,7 @@ namespace FootballQuizAPI.Controllers
             return Ok(response);
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDTO model)
-        {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-            var user = await _userManager.FindByNameAsync(model.UserName);
-            if (user == null)
-            {
-                return NotFound("User not found");
-            }
-
-            var result = await _signInManager.PasswordSignInAsync(user, model.Password, false, false);
-
-            if (result.Succeeded)
-            {
-                var jwtToken = await _tokenService.GenerateToken(user);
-                return Ok(jwtToken);
-            }
-
-            if (result.IsLockedOut)
-            {
-                return BadRequest("User account locked out.");
-            }
-
-            return BadRequest("Invalid login attempt.");
-        }
-
-
-        [HttpPost("create")]
-        public async Task<IActionResult> CreateUser([FromBody] string code)
-        {
-            var random = new Random();
-            var username = "User" + random.Next(1000000, 9999999);
-            var password = random.Next(10000, 99999).ToString();
-            var defaultCountryCode = "US";
-
-            var user = new User
-            {
-                UserName = username,
-                CountryCode = code,
-                Level = 1
-            };
-
-            var result = await _userManager.CreateAsync(user, password);
-
-            if (result.Succeeded)
-            {
-                var roleRusult = await _userManager.AddToRoleAsync(user, "User");
-
-                if (!roleRusult.Succeeded) return BadRequest("Error Role Assignment");
-
-                return Ok(new { username, password, country = defaultCountryCode });
-            }
-
-            return BadRequest(result.Errors);
-        }
-
-        [HttpPut("update")]
-        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserDTO model)
-        {
-            var user = await _userManager.FindByNameAsync(model.UserName);
-            if (user == null) return NotFound("User not found");
-
-            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, model.Password);
-            user.CountryCode = model.CountryCode;
-
-            var result = await _userManager.UpdateAsync(user);
-
-            if (result.Succeeded)
-            {
-                return Ok();
-            }
-
-            return BadRequest(result.Errors);
-        }
-
+      
 
 
 

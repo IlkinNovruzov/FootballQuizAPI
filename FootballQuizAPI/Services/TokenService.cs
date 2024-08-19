@@ -32,7 +32,6 @@ namespace FootballQuizAPI.Services
 
             var claims = new List<Claim>
             {
-                new Claim(JwtClaimNames.Sub, user.Email),
                 new Claim(JwtClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
@@ -85,12 +84,14 @@ namespace FootballQuizAPI.Services
                     return null;
                 }
 
-                return await _userManager.FindByEmailAsync(userIdClaim.Value);
+                // Burada FindByIdAsync metodunu kullanarak ID'ye göre kullanıcıyı buluyoruz.
+                return await _userManager.FindByIdAsync(userIdClaim.Value);
             }
             catch
             {
                 return null;
             }
         }
+
     }
 }

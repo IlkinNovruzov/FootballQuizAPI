@@ -1,8 +1,9 @@
-﻿namespace FootballQuizAPI.Models
+﻿using FootballQuizAPI.DAL;
+
+namespace FootballQuizAPI.Models
 {
-    public class QuizResult
+    public class QuizResult:BaseEntity
     {
-        public int Id { get; set; }
         public long XP { get; set; } 
         public DateTime DateTaken { get; set; } 
         public int UserId { get; set; } 

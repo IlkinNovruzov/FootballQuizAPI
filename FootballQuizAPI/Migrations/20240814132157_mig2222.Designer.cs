@@ -4,6 +4,7 @@ using FootballQuizAPI.DAL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FootballQuizAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240814132157_mig2222")]
+    partial class mig2222
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -39,10 +42,6 @@ namespace FootballQuizAPI.Migrations
 
                     b.Property<byte>("UnlockLevel")
                         .HasColumnType("tinyint");
-
-                    b.Property<string>("UnlockLevels")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -272,7 +271,7 @@ namespace FootballQuizAPI.Migrations
                             Id = 1,
                             AccessFailedCount = 0,
                             Chest = (byte)0,
-                            ConcurrencyStamp = "80c86dde-0cf9-42de-95b5-ecc3b7b8b028",
+                            ConcurrencyStamp = "196e33e2-b555-4b4b-abb4-145aea103221",
                             CountryCode = "az",
                             Email = "inovruzov2004@gmail.com",
                             EmailConfirmed = true,
@@ -283,9 +282,9 @@ namespace FootballQuizAPI.Migrations
                             LockoutEnabled = true,
                             NormalizedEmail = "INOVRUZOV2004@GMAIL.COM",
                             NormalizedUserName = "ILKIN.ADMIN",
-                            PasswordHash = "AQAAAAIAAYagAAAAEDj2sKu42oIfHIE+Le3MVZzM2AJ2Cagc55YN7K6UU7i/ZBb1JLCMyACly5lx9Q66mw==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEMZthrwz0L2R2ukRB86cneDOVBichLOq4QgrPYFTh8kmQhBZtbL/YIKf+DPAKlJmhQ==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "4d5380f6-6ca7-4a9f-b954-919a38a9dc8e",
+                            SecurityStamp = "8b3813c8-a8cd-4178-b78d-df1a5c8bd5ea",
                             TwoFactorEnabled = false,
                             UserName = "ilkin.admin",
                             XP = 100L

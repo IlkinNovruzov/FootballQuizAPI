@@ -20,26 +20,28 @@ namespace FootballQuizAPI
             builder.Services.AddDbContext<AppDbContext>(options =>
                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-            builder.Services.AddIdentity<User,Role>()
+            builder.Services.AddIdentity<User, Role>()
                 .AddEntityFrameworkStores<AppDbContext>()
                 .AddDefaultTokenProviders();
+
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowSpecificOrigin",
-                    builder => builder.WithOrigins("http://127.0.0.1:5500", "http://localhost:5174")
+                    builder => builder.WithOrigins("http://127.0.0.1:5500", "http://localhost:5174", "http://localhost:5175")
                                       .AllowAnyMethod()
                                       .AllowAnyHeader());
             });
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddScoped<TokenService>();
+
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
             })
            .AddJwtBearer(options =>
            {
@@ -55,6 +57,7 @@ namespace FootballQuizAPI
                };
            })
            .AddCookie();
+
             builder.Services.Configure<IdentityOptions>(options =>
             {
                 // Password settings.
@@ -64,16 +67,11 @@ namespace FootballQuizAPI
                 options.Password.RequireNonAlphanumeric = false;
                 options.Password.RequiredLength = 4;
 
-                // Lockout settings.
-                //options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-                //options.Lockout.MaxFailedAccessAttempts = 5;
-                //options.Lockout.AllowedForNewUsers = true;
-
                 // User settings.
-                //options.User.AllowedUserNameCharacters =
-                //"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
+                options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._";
                 options.User.RequireUniqueEmail = false;
             });
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -81,12 +79,14 @@ namespace FootballQuizAPI
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+                app.UseDeveloperExceptionPage(); // Add this for detailed error pages during development.
             }
 
             app.UseHttpsRedirection();
             app.UseCors("AllowSpecificOrigin");
-            app.UseAuthorization();
 
+            app.UseAuthentication(); // Ensure this is added.
+            app.UseAuthorization();
 
             app.MapControllers();
 

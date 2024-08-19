@@ -6,6 +6,7 @@ namespace FootballQuizAPI.Models
     {
         public string Name { get; set; }
         public byte UnlockLevel { get; set; }
+        public string UnlockLevels { get; set; }
         public List<Question> Questions { get; set; }
     }
 }
