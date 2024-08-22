@@ -55,6 +55,63 @@ namespace FootballQuizAPI.Controllers
             return Ok(response);
         }
 
+        [HttpGet("top1000")]
+        public async Task<ActionResult<IEnumerable<object>>> GetTop1000([FromQuery] string period, int page = 1, int pageSize = 10, string? countryCode = null)
+        {
+            var now = DateTime.UtcNow;
+            IQueryable<QuizResult> query = _context.QuizResults.Include(q => q.User);
+
+            if (!string.IsNullOrEmpty(countryCode)) query = query.Where(q => q.User.CountryCode == countryCode);
+
+            switch (period.ToLower())
+            {
+                case "day":
+                    query = query.Where(q => q.DateTaken.Date == now.Date);
+                    break;
+                case "month":
+                    query = query.Where(q => q.DateTaken.Year == now.Year && q.DateTaken.Month == now.Month);
+                    break;
+                case "year":
+                    query = query.Where(q => q.DateTaken.Year == now.Year);
+                    break;
+                case "alltime":
+                    break;
+                default:
+                    return BadRequest("Invalid period specified.");
+            }
+
+            var totalUsers = await query
+                .GroupBy(q => q.UserId)
+                .CountAsync();
+
+            var totalPages = (int)Math.Ceiling(totalUsers / (double)pageSize);
+
+            // İlk 1000 kullanıcıyı getir
+            var results = await query
+                .GroupBy(q => q.UserId)
+                .Select(g => new
+                {
+                    User = g.FirstOrDefault() != null ? g.FirstOrDefault().User : null,
+                    TotalXP = g.Sum(q => q.XP) // Kullanıcının toplam XP'sini hesapla
+                })
+                .OrderByDescending(g => g.TotalXP) // Kullanıcıları XP'ye göre sırala
+                .Take(1000) // İlk 1000 kullanıcıyı al
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var response = new
+            {
+                Users = results,
+                TotalPages = totalPages,
+                CurrentPage = page,
+                TotalUsers = totalUsers
+            };
+
+            return Ok(response);
+        }
+
+
         [HttpPost("user-info")]
         public async Task<ActionResult> GetUser([FromHeader(Name = "Authorization")] string token)
         {
@@ -231,11 +288,10 @@ namespace FootballQuizAPI.Controllers
         }
 
 
-
         private static (byte currentLevel, long xpForNextLevel, long currentLevelXP) CalculateLevelAndXP(long totalXP)
         {
             byte level = 1;
-            long xpForNextLevel = 50;
+            long xpForNextLevel = 100;
             long remainingXP = totalXP;
 
             while (remainingXP >= xpForNextLevel)
