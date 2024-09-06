@@ -74,6 +74,8 @@ namespace FootballQuizAPI.Controllers
                 case "year":
                     query = query.Where(q => q.DateTaken.Year == now.Year);
                     break;
+                case "bestscore":
+                    break;
                 case "alltime":
                     break;
                 default:
@@ -86,16 +88,20 @@ namespace FootballQuizAPI.Controllers
 
             var totalPages = (int)Math.Ceiling(totalUsers / (double)pageSize);
 
-            // İlk 1000 kullanıcıyı getir
             var results = await query
                 .GroupBy(q => q.UserId)
                 .Select(g => new
                 {
-                    User = g.FirstOrDefault() != null ? g.FirstOrDefault().User : null,
-                    TotalXP = g.Sum(q => q.XP) // Kullanıcının toplam XP'sini hesapla
+                    User = new GetUserDTO
+                    {
+                        UserName = g.First().User.UserName,
+                        CountryCode = g.First().User.CountryCode
+                    },
+                    TotalXP = g.Sum(q => q.XP),
+                    BestScore = g.Max(q => q.XP)
                 })
-                .OrderByDescending(g => g.TotalXP) // Kullanıcıları XP'ye göre sırala
-                .Take(1000) // İlk 1000 kullanıcıyı al
+                .OrderByDescending(g => period == "bestscore" ? g.BestScore : g.TotalXP)
+                .Take(1000)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -111,12 +117,110 @@ namespace FootballQuizAPI.Controllers
             return Ok(response);
         }
 
+        [HttpGet("user/stats")]
+        public async Task<ActionResult<object>> GetUserStats([FromHeader(Name = "Authorization")] string token)
+        {
+            var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
+            if (user == null) return Unauthorized("Invalid token or user.");
+
+            int id = user.Id;
+            var countryCode = user.CountryCode;
+            var now = DateTime.UtcNow;
+            var userQuizzes = _context.QuizResults
+                .Where(q => q.UserId == id);
+
+            var todayXP = await userQuizzes
+                .Where(q => q.DateTaken.Date == now.Date)
+                .SumAsync(q => q.XP);
+
+            var monthXP = await userQuizzes
+                .Where(q => q.DateTaken.Year == now.Year && q.DateTaken.Month == now.Month)
+                .SumAsync(q => q.XP);
+
+            var yearXP = await userQuizzes
+                .Where(q => q.DateTaken.Year == now.Year)
+                .SumAsync(q => q.XP);
+
+            var highestScore = await userQuizzes
+                .OrderByDescending(q => q.XP)
+                .Select(q => q.XP)
+                .FirstOrDefaultAsync();
+
+            var totalXP = await userQuizzes.SumAsync(q => q.XP);
+
+            var todayRank = (await _context.QuizResults
+                .Where(q => q.DateTaken.Date == now.Date)
+                .GroupBy(q => q.UserId)
+                .Select(g => new { UserId = g.Key, TotalXP = g.Sum(q => q.XP) })
+                .OrderByDescending(g => g.TotalXP)
+                .ToListAsync())
+                .Select((g, index) => new { g.UserId, Rank = index + 1 })
+                .FirstOrDefault(g => g.UserId == id);
+
+            var monthRank = (await _context.QuizResults
+               .Where(q => q.DateTaken.Year == now.Year && q.DateTaken.Month == now.Month)
+               .GroupBy(q => q.UserId)
+               .Select(g => new { UserId = g.Key, TotalXP = g.Sum(q => q.XP) })
+               .OrderByDescending(g => g.TotalXP)
+               .ToListAsync())
+               .Select((g, index) => new { g.UserId, Rank = index + 1 })
+               .FirstOrDefault(g => g.UserId == id);
+
+            var yearRank = (await _context.QuizResults
+              .Where(q => q.DateTaken.Year == now.Year)
+              .GroupBy(q => q.UserId)
+              .Select(g => new { UserId = g.Key, TotalXP = g.Sum(q => q.XP) })
+              .OrderByDescending(g => g.TotalXP)
+              .ToListAsync())
+              .Select((g, index) => new { g.UserId, Rank = index + 1 })
+              .FirstOrDefault(g => g.UserId == id);
+
+            var totalRank = (await _context.QuizResults
+             .GroupBy(q => q.UserId)
+             .Select(g => new { UserId = g.Key, TotalXP = g.Sum(q => q.XP) })
+             .OrderByDescending(g => g.TotalXP)
+             .ToListAsync())
+             .Select((g, index) => new { g.UserId, Rank = index + 1 })
+             .FirstOrDefault(g => g.UserId == id);
+
+            var highestScoreRank = (await _context.QuizResults
+             .GroupBy(q => q.UserId)
+             .Select(g => new { UserId = g.Key, HighestScore = g.Max(q => q.XP) })
+             .OrderByDescending(g => g.HighestScore)
+             .ToListAsync())
+             .Select((g, index) => new { g.UserId, Rank = index + 1 })
+             .FirstOrDefault(g => g.UserId == id);
+
+            try
+            {
+                var userStats = new
+                {
+                    TodayXP = todayXP,
+                    TodayRank = todayRank?.Rank,
+                    MonthXP = monthXP,
+                    MonthRank = monthRank?.Rank,
+                    YearXP = yearXP,
+                    YearRank = yearRank?.Rank,
+                    HighestScore = highestScore,
+                    HighestScoreRank = highestScoreRank?.Rank,
+                    TotalXP = totalXP,
+                    TotalRank = totalRank?.Rank,
+                    CountryCode = countryCode
+                };
+
+                return Ok(userStats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Internal server error: " + ex.Message);
+            }
+        }
 
         [HttpPost("user-info")]
         public async Task<ActionResult> GetUser([FromHeader(Name = "Authorization")] string token)
         {
             var user = await _tokenService.ValidateTokenAndGetUserAsync(token);
-            if (user == null) return Unauthorized("Invalid token or user.");
+            if (user == null) return Unauthorized(new { text = "Invalid token or user." });
 
             return Ok(user);
         }
@@ -186,7 +290,7 @@ namespace FootballQuizAPI.Controllers
             var user = await _userManager.FindByNameAsync(model.UserName);
             if (user == null)
             {
-                return NotFound("User not found");
+                return NotFound(new { text = "User not found" });
             }
 
             var result = await _signInManager.PasswordSignInAsync(user, model.Password, false, false);
@@ -200,10 +304,10 @@ namespace FootballQuizAPI.Controllers
 
             if (result.IsLockedOut)
             {
-                return BadRequest("User account locked out.");
+                return BadRequest(new { text = "User account locked out." });
             }
 
-            return BadRequest("Invalid login attempt.");
+            return BadRequest(new { text = "Invalid login attempt." });
         }
 
         [HttpPost("google-login")]
@@ -249,6 +353,8 @@ namespace FootballQuizAPI.Controllers
             if (user == null) return Unauthorized("Invalid token or user.");
 
             user.XP += xp;
+            var (currentLevel, xpForNextLevel, currentLevelXP) = CalculateLevelAndXP(user.XP);
+            user.Level = currentLevel;
             var quizResult = new QuizResult
             {
                 XP = xp,
@@ -260,7 +366,7 @@ namespace FootballQuizAPI.Controllers
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
-            return Ok("saved");
+            return Ok(new { Message = "saved" });
         }
 
         [HttpGet("home")]
@@ -270,7 +376,9 @@ namespace FootballQuizAPI.Controllers
             if (user == null) return Unauthorized("Invalid token or user.");
 
             var (currentLevel, xpForNextLevel, currentLevelXP) = CalculateLevelAndXP(user.XP);
-
+            var userRank = 0;
+            var userRankResult = await _context.Users.Where(u => u.XP > user.XP).CountAsync() + 1;
+            if (userRankResult != 0 && user.XP != 0 && userRankResult < 10000) userRank = userRankResult;
             var homePageModel = new HomePageDTO
             {
                 Username = user.UserName,
@@ -282,7 +390,8 @@ namespace FootballQuizAPI.Controllers
                 Chest = user.Chest,
                 Hint = user.Hint,
                 CurrentXP = currentLevelXP,
-                XPForNextLevel = xpForNextLevel
+                XPForNextLevel = xpForNextLevel,
+                UserRank = userRank
             };
             return Ok(homePageModel);
         }
@@ -291,14 +400,14 @@ namespace FootballQuizAPI.Controllers
         private static (byte currentLevel, long xpForNextLevel, long currentLevelXP) CalculateLevelAndXP(long totalXP)
         {
             byte level = 1;
-            long xpForNextLevel = 100;
+            long xpForNextLevel = 500;
             long remainingXP = totalXP;
 
             while (remainingXP >= xpForNextLevel)
             {
                 remainingXP -= xpForNextLevel;
                 level++;
-                xpForNextLevel = (long)Math.Round(xpForNextLevel * 1.5);
+                xpForNextLevel = (long)Math.Round(xpForNextLevel * 1.9);
             }
 
             return (level, xpForNextLevel, remainingXP);

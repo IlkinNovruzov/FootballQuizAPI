@@ -45,7 +45,7 @@ namespace FootballQuizAPI.Controllers
         [HttpPost("get-questions")]
         public async Task<IActionResult> GetQuestions([FromBody] List<DifficultyDTO> categoryDifficultyRequests)
         {
-            if (categoryDifficultyRequests == null || categoryDifficultyRequests.Count == 0)  return BadRequest("Kategori ve zorluk seviyeleri gönderilmedi.");
+            if (categoryDifficultyRequests == null || categoryDifficultyRequests.Count == 0) return BadRequest("Kategori ve zorluk seviyeleri gönderilmedi.");
 
             var questionsList = new List<GetQuestionDTO>();
 
@@ -73,7 +73,7 @@ namespace FootballQuizAPI.Controllers
                 questionsList.AddRange(questions);
             }
 
-            if (questionsList.Count == 0)  return NotFound("Belirtilen kategoriler ve zorluk seviyeleri için soru bulunamadı.");
+            if (questionsList.Count == 0) return NotFound("Belirtilen kategoriler ve zorluk seviyeleri için soru bulunamadı.");
 
             // Soruları karıştır
             questionsList = questionsList.OrderBy(q => Guid.NewGuid()).ToList();
@@ -105,6 +105,8 @@ namespace FootballQuizAPI.Controllers
         [HttpPost("create")]
         public async Task<IActionResult> CreateQuestion([FromBody] CreateQuestionDTO dto)
         {
+            var test =await  _context.Questions.FirstOrDefaultAsync(q => q.Answer == dto.Answer);
+            if(test != null) return BadRequest(new {Message="Sameeeeee"});
             var question = new Question
             {
                 QuestionText = dto.QuestionText,

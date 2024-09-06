@@ -13,5 +13,7 @@
         public byte Chest { get; set; }
         public long CurrentXP { get; set; }
         public long XPForNextLevel { get; set; }
+        public int UserRank { get; set; }
+        
     }
 }
